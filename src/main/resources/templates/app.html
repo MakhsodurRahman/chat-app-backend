@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp-like Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        }
+
+        body {
+            background: #f0f0f0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Login Page Styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 400px;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .login-card h1 {
+            color: #25d366;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #25d366;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 15px;
+            background: #25d366;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: #22bf5b;
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Chat Dashboard Styles */
+        .chat-container {
+            display: none;
+            height: 100vh;
+            background: #e5ddd5;
+        }
+
+        .chat-header {
+            background: #075e54;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: #25d366;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .chat-main {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 30%;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            background: #f0f0f0;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .sidebar-header h3 {
+            color: #075e54;
+            margin-bottom: 10px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .users-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+
+        .user-item:hover {
+            background: #f5f5f5;
+        }
+
+        .user-item.active {
+            background: #dcf8c6;
+        }
+
+        .user-item .user-avatar {
+            width: 50px;
+            height: 50px;
+            margin-right: 15px;
+        }
+
+        .user-details {
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .user-status {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            background: #25d366;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+
+        .offline-indicator {
+            width: 8px;
+            height: 8px;
+            background: #ccc;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+
+        /* Chat Area Styles */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #e5ddd5;
+        }
+
+        .chat-header-right {
+            background: #f0f0f0;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+
+        .selected-user-info h3 {
+            margin-bottom: 2px;
+        }
+
+        .selected-user-status {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50%" font-size="100" opacity="0.05">💬</text></svg>');
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 15px;
+            max-width: 70%;
+        }
+
+        .message.sent {
+            margin-left: auto;
+        }
+
+        .message.received {
+            margin-right: auto;
+        }
+
+        .message-bubble {
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.sent .message-bubble {
+            background: #dcf8c6;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.received .message-bubble {
+            background: white;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .message-sender {
+            font-size: 12px;
+            color: #25d366;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        /* Message Input Styles */
+        .message-input {
+            background: #f0f0f0;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .message-input input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .send-button {
+            width: 45px;
+            height: 45px;
+            background: #25d366;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .send-button:hover {
+            background: #22bf5b;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Empty State */
+        .empty-chat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+            text-align: center;
+        }
+
+        .empty-chat h3 {
+            margin-bottom: 10px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 35%;
+            }
+
+            .message {
+                max-width: 85%;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .chat-main {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 50%;
+            }
+
+            .chat-area {
+                height: 50%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login Page -->
+    <div class="login-container" id="loginPage">
+        <div class="login-card">
+            <h1>💬 Chat App</h1>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Your Name</label>
+                    <input type="text" id="username" required placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required placeholder="Enter your email">
+                </div>
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    Join Chat
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chat Dashboard -->
+    <div class="chat-container" id="chatDashboard">
+        <div class="chat-header">
+            <div class="user-info">
+                <div class="user-avatar" id="currentUserAvatar">U</div>
+                <div>
+                    <div id="currentUserName">User</div>
+                    <div id="currentUserEmail" style="font-size: 12px; opacity: 0.8;"></div>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="logout()" style="width: auto; padding: 8px 16px;">
+                Logout
+            </button>
+        </div>
+
+        <div class="chat-main">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h3>Users</h3>
+                    <input type="text" class="search-box" placeholder="Search users..." id="searchUsers">
+                </div>
+                <div class="users-list" id="usersList">
+                    <!-- Users will be populated here -->
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <div class="chat-header-right" id="chatHeader" style="display: none;">
+                    <div class="user-avatar" id="selectedUserAvatar">U</div>
+                    <div class="selected-user-info" style="margin-left: 15px;">
+                        <h3 id="selectedUserName">Select a user</h3>
+                        <div class="selected-user-status" id="selectedUserStatus">Click on a user to start chatting
+                        </div>
+                    </div>
+                </div>
+
+                <div class="messages-container" id="messagesContainer">
+                    <div class="empty-chat">
+                        <h3>Welcome to Chat App</h3>
+                        <p>Select a user from the sidebar to start chatting</p>
+                    </div>
+                </div>
+
+                <div class="message-input" id="messageInputArea" style="display: none;">
+                    <input type="text" placeholder="Type a message..." id="messageInput">
+                    <button class="send-button" id="sendButton">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        let stompClient = null;
+        let currentUser = null;
+        let selectedUser = null;
+        let allUsers = [];
+        let messages = {};
+
+        // Initialize the application
+        document.getElementById('loginForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            login();
+        });
+
+        document.getElementById('messageInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+
+        document.getElementById('searchUsers').addEventListener('input', function (e) {
+            filterUsers(e.target.value);
+        });
+
+        // Login function
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            if (!username || !email) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            currentUser = {
+                username: username,
+                email: email
+            };
+
+            // Update UI
+            document.getElementById('currentUserName').textContent = username;
+            document.getElementById('currentUserEmail').textContent = email;
+            document.getElementById('currentUserAvatar').textContent = username.charAt(0).toUpperCase();
+
+            // Connect to WebSocket
+            connect();
+
+            // Hide login page, show chat
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('chatDashboard').style.display = 'block';
+        }
+
+        // WebSocket connection
+        function connect() {
+            const socket = new SockJS('http://localhost:8080/ws');
+            stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+
+                // Subscribe to user list updates
+                stompClient.subscribe('/topic/users', function (response) {
+                    const users = JSON.parse(response.body);
+                    updateUsersList(users);
+                });
+
+                // Subscribe to messages for current user
+                stompClient.subscribe('/topic/messages/' + currentUser.email, function (response) {
+                    const message = JSON.parse(response.body);
+                    receiveMessage(message);
+                });
+
+                // Register current user
+                stompClient.send('/app/user', {}, JSON.stringify(currentUser));
+
+            }, function (error) {
+                console.error('WebSocket connection failed:', error);
+                alert('Failed to connect to chat server. Please try again.');
+            });
+        }
+
+        // Update users list in sidebar
+        function updateUsersList(users) {
+            allUsers = users.filter(user => user.email !== currentUser.email);
+            renderUsersList(allUsers);
+        }
+
+        // Render users list
+        function renderUsersList(users) {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '';
+
+            users.forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.className = 'user-item';
+                userItem.onclick = () => selectUser(user);
+
+                const isOnline = user.isActive;
+                const avatar = user.username.charAt(0).toUpperCase();
+
+                userItem.innerHTML = `
+                <div class="user-avatar">${avatar}</div>
+                <div class="user-details">
+                    <div class="user-name">${user.username}</div>
+                    <div class="user-status">${user.email}</div>
+                </div>
+                <div class="${isOnline ? 'online-indicator' : 'offline-indicator'}"></div>
+            `;
+
+                if (selectedUser && selectedUser.email === user.email) {
+                    userItem.classList.add('active');
+                }
+
+                usersList.appendChild(userItem);
+            });
+        }
+
+        // Filter users based on search
+        function filterUsers(searchTerm) {
+            const filtered = allUsers.filter(user =>
+                user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                user.email.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            renderUsersList(filtered);
+        }
+
+        // Select a user to chat with
+        function selectUser(user) {
+            selectedUser = user;
+
+            // Update selected user info
+            document.getElementById('selectedUserName').textContent = user.username;
+            document.getElementById('selectedUserStatus').textContent = user.isActive ? 'Online' : 'Offline';
+            document.getElementById('selectedUserAvatar').textContent = user.username.charAt(0).toUpperCase();
+
+            // Show chat header and message input
+            document.getElementById('chatHeader').style.display = 'flex';
+            document.getElementById('messageInputArea').style.display = 'flex';
+
+            // Update active user in sidebar
+            document.querySelectorAll('.user-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            // Load messages for this user
+            loadMessages(user.email);
+        }
+
+        // Load messages for selected user
+        function loadMessages(userEmail) {
+            const messagesContainer = document.getElementById('messagesContainer');
+            messagesContainer.innerHTML = '';
+
+            const userMessages = messages[userEmail] || [];
+
+            if (userMessages.length === 0) {
+                messagesContainer.innerHTML = `
+                <div class="empty-chat">
+                    <h3>Start a conversation</h3>
+                    <p>Send a message to ${selectedUser.username}</p>
+                </div>
+            `;
+            } else {
+                userMessages.forEach(message => {
+                    displayMessage(message);
+                });
+            }
+        }
+
+        // Send a message
+        function sendMessage() {
+            if (!selectedUser) {
+                alert('Please select a user to chat with');
+                return;
+            }
+
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+
+            if (!content) return;
+
+            const message = {
+                content: content,
+                senderEmail: currentUser.email,
+                senderName: currentUser.username,
+                receiverEmail: selectedUser.email,
+                timestamp: new Date().toISOString()
+            };
+
+            // Send via WebSocket
+            stompClient.send('/app/message', {}, JSON.stringify(message));
+
+            // Add to local messages and display
+            if (!messages[selectedUser.email]) {
+                messages[selectedUser.email] = [];
+            }
+            messages[selectedUser.email].push(message);
+            displayMessage(message);
+
+            // Clear input
+            messageInput.value = '';
+        }
+
+        // Receive a message
+        function receiveMessage(message) {
+            const senderEmail = message.senderEmail;
+
+            if (!messages[senderEmail]) {
+                messages[senderEmail] = [];
+            }
+            messages[senderEmail].push(message);
+
+            // If this message is from the currently selected user, display it
+            if (selectedUser && selectedUser.email === senderEmail) {
+                displayMessage(message);
+            }
+        }
+
+        // Display a message in the chat
+        function displayMessage(message) {
+            const messagesContainer = document.getElementById('messagesContainer');
+
+            // Remove empty state if present
+            const emptyChat = messagesContainer.querySelector('.empty-chat');
+            if (emptyChat) {
+                emptyChat.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            const isSent = message.senderEmail === currentUser.email;
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+
+            const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            messageDiv.innerHTML = `
+            <div class="message-bubble">
+                ${!isSent ? `<div class="message-sender">${message.senderName}</div>` : ''}
+                <div class="message-content">${message.content}</div>
+                <div class="message-info">
+                    <span class="message-time">${message.timestamp}</span>
+                </div>
+            </div>
+        `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Logout function
+        function logout() {
+            if (stompClient) {
+                stompClient.disconnect();
+            }
+
+            // Reset state
+            currentUser = null;
+            selectedUser = null;
+            allUsers = [];
+            messages = {};
+
+            // Reset UI
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('chatDashboard').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('email').value = '';
+        }
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function () {
+            if (stompClient) {
+                stompClient.disconnect();
+            }
+        });
+    </script>
+</body>
+
+</html>

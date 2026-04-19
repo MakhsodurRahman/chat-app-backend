@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-time User Notifications</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        #notifications { margin-top: 20px; }
+        .notification { background: #f0f0f0; margin: 5px; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+<h1>Register User</h1>
+<form id="userForm">
+    <input type="text" id="name" placeholder="Name" required>
+    <input type="email" id="email" placeholder="Email" required>
+    <button type="submit">Submit</button>
+</form>
+
+<h2>Notifications</h2>
+<div id="notifications"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    let stompClient = null;
+    let userEmail = null;
+
+    function connectWebSocket() {
+        const socket = new SockJS('http://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            stompClient.send("/app/register", {}, JSON.stringify({ recipientEmail: userEmail }));
+
+            stompClient.subscribe(`/user/queue/messages`, function(notification){
+                const n = JSON.parse(notification.body);
+                const div = document.createElement('div');
+                div.className = 'notification';
+                div.textContent = `${n.senderName || 'Server'}: ${n.comment}`;
+                document.getElementById('notifications').appendChild(div);
+            });
+        });
+
+        socket.onclose = function() {
+            console.log('WebSocket closed, reconnecting...');
+            setTimeout(connectWebSocket, 2000);
+        };
+    }
+
+    document.getElementById('userForm').addEventListener('submit', function(e){
+        e.preventDefault();
+        const name = document.getElementById('name').value;
+        userEmail = document.getElementById('email').value;
+
+        fetch('http://localhost:8080/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email: userEmail })
+        }).then(res => res.json())
+          .then(data => {
+              console.log('User registered', data);
+              connectWebSocket();
+          }).catch(err => console.error('Error:', err));
+    });
+</script>
+</body>
+</html>

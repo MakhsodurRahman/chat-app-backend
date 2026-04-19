@@ -1,0 +1,35 @@
+name: Deploy Backend to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy Backend to EC2
+        run: |
+          echo "${{ secrets.AWS_KEY }}" > private_key.pem
+          chmod 600 private_key.pem
+
+          # 1. Create the backend directory on your server automatically if it doesn't exist
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} 'mkdir -p ~/realtime-notification'
+
+          # 2. Securely copy the latest code from GitHub straight into your AWS server folder
+          #    This avoids needing to run 'git pull' or manage GitHub credentials on the server itself.
+          scp -o StrictHostKeyChecking=no -i private_key.pem -r * ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }}:~/realtime-notification/
+
+          # 3. Rebuild and restart the Docker container with the fresh code
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${{ secrets.AWS_USER }}@${{ secrets.AWS_HOST }} << 'EOF'
+            cd ~/realtime-notification
+            docker compose down
+            docker compose up -d --build
+          EOF
+          
+          # Clean up the private key securely from the GitHub runner
+          rm -f private_key.pem

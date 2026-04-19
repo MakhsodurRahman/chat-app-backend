@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: realtime-notification-backend:latest
+    container_name: realtime-notification-backend
+    ports:
+      - "8080:8080"
+    restart: always
+    # Uncomment and adjust the following if you need environment variables in the future
+    # environment:
+    #   - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/yourdb
+    #   - SPRING_DATASOURCE_USERNAME=root
+    #   - SPRING_DATASOURCE_PASSWORD=secret
+    #   - SPRING_DATA_REDIS_HOST=redis
+    #   - SPRING_DATA_REDIS_PORT=6379

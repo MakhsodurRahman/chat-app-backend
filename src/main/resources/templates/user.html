@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - Message Center</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4F46E5, #7C3AED);
+            color: white;
+            padding: 25px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 18px;
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
+        .status-dot.registered {
+            background: #f59e0b;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .status-text {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-section {
+            padding: 30px;
+        }
+
+        /* Registration Form Styles */
+        .registration-section {
+            display: block;
+        }
+
+        .registration-section.hidden {
+            display: none;
+        }
+
+        .form-container {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .form-title {
+            text-align: center;
+            color: #1f2937;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .form-subtitle {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            color: #374151;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px 18px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #4F46E5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .form-input:invalid {
+            border-color: #ef4444;
+        }
+
+        .register-button {
+            width: 100%;
+            background: linear-gradient(135deg, #4F46E5, #7C3AED);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .register-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        .register-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Welcome Section Styles */
+        .welcome-section {
+            display: none;
+        }
+
+        .welcome-section.visible {
+            display: block;
+        }
+
+        .welcome-card {
+            background: linear-gradient(135deg, #f0fdf4, #f7fee7);
+            padding: 30px;
+            border-radius: 16px;
+            border: 2px solid #bbf7d0;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .welcome-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #047857;
+            margin-bottom: 10px;
+        }
+
+        .welcome-subtitle {
+            color: #065f46;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .user-info {
+            background: rgba(255, 255, 255, 0.7);
+            padding: 15px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .user-info strong {
+            color: #047857;
+        }
+
+        /* Messages Section */
+        .messages-section {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .messages-header {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+            padding: 20px 25px;
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .message-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .messages-list {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message-item {
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            padding: 18px 22px;
+            margin-bottom: 15px;
+            border-radius: 14px;
+            border-left: 5px solid #4F46E5;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            animation: messageSlideIn 0.4s ease-out;
+        }
+
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .message-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-item.new-message {
+            border-left-color: #10b981;
+            background: linear-gradient(135deg, #f0fff4, #f7fee7);
+            animation: messageSlideIn 0.4s ease-out, newMessageGlow 2s ease-out;
+        }
+
+        @keyframes newMessageGlow {
+            0% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+            100% { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05); }
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .message-sender {
+            font-weight: 700;
+            color: #1f2937;
+            font-size: 16px;
+        }
+
+        .message-time {
+            color: #6b7280;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .message-content {
+            color: #374151;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .message-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .empty-messages {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .empty-messages .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .empty-messages h3 {
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+
+        .empty-messages p {
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        /* Loading States */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #4F46E5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Notification Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        /* Clear Messages Button */
+        .clear-messages {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .clear-messages:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 16px;
+            }
+
+            .user-section {
+                padding: 20px;
+            }
+
+            .header {
+                padding: 20px;
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .messages-list {
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>👤 User Dashboard</h1>
+        <div class="connection-status">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">Not Connected</span>
+        </div>
+    </div>
+
+    <div class="user-section">
+        <!-- Registration Section -->
+        <div class="registration-section" id="registrationSection">
+            <div class="form-container">
+                <h2 class="form-title">🚀 Join the Platform</h2>
+                <p class="form-subtitle">Register to receive messages from admin</p>
+
+                <form id="userForm">
+                    <div class="form-group">
+                        <label class="form-label" for="username">Full Name</label>
+                        <input
+                                type="text"
+                                id="username"
+                                class="form-input"
+                                placeholder="Enter your full name"
+                                required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="email">Email Address</label>
+                        <input
+                                type="email"
+                                id="email"
+                                class="form-input"
+                                placeholder="Enter your email address"
+                                required
+                        >
+                    </div>
+
+                    <button type="submit" class="register-button" id="registerButton">
+                        📝 Register & Connect
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Welcome Section -->
+        <div class="welcome-section" id="welcomeSection">
+            <div class="welcome-card">
+                <h2 class="welcome-title">🎉 Welcome!</h2>
+                <p class="welcome-subtitle">You are now connected and ready to receive messages</p>
+                <div class="user-info">
+                    <strong>Name:</strong> <span id="displayName">Guest</span><br>
+                    <strong>Email:</strong> <span id="displayEmail">Not set</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Section -->
+        <div class="messages-section">
+            <div class="messages-header">
+                💬 Messages from Admin
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <span class="message-count" id="messageCount">0 Messages</span>
+                    <button class="clear-messages" onclick="clearAllMessages()">
+                        Clear All
+                    </button>
+                </div>
+            </div>
+            <div class="messages-list" id="notifications">
+                <div class="empty-messages">
+                    <div class="icon">📭</div>
+                    <h3>No messages yet</h3>
+                    <p>You'll see admin messages here when they arrive</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    let stompClient = null;
+    let userEmail = null;
+    let userName = null;
+    let messageCount = 0;
+    let isConnected = false;
+
+    function updateConnectionStatus(status, text) {
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+
+        statusDot.className = `status-dot ${status}`;
+        statusText.textContent = text;
+    }
+
+    function connect() {
+        if (!userEmail) return;
+
+        updateConnectionStatus('', 'Connecting...');
+
+        const socket = new SockJS('http://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+            isConnected = true;
+            updateConnectionStatus('connected', 'Connected');
+
+            // Subscribe to messages for this user
+            stompClient.subscribe(`/topic/messages/${userEmail}`, function(msg) {
+                const message = JSON.parse(msg.body);
+                showMessage(message, true); // true indicates new message
+            });
+
+            // Register user via WebSocket - This will trigger offline message delivery
+            stompClient.send("/app/user", {}, JSON.stringify({
+                username: userName,
+                email: userEmail
+            }));
+
+            showToast('✅ Successfully connected! You will receive all pending messages.');
+
+        }, function(error) {
+            console.error('Connection error:', error);
+            updateConnectionStatus('', 'Connection Failed');
+
+            // Retry connection after 3 seconds
+            setTimeout(() => {
+                if (!isConnected) {
+                    connect();
+                }
+            }, 3000);
+        });
+
+        socket.onclose = function() {
+            console.log('WebSocket closed, reconnecting...');
+            isConnected = false;
+            updateConnectionStatus('', 'Reconnecting...');
+            setTimeout(connect, 2000);
+        };
+
+        socket.onerror = function(error) {
+            console.error('WebSocket error:', error);
+            updateConnectionStatus('', 'Connection Error');
+        };
+    }
+
+    function showMessage(message, isNew = false) {
+        const notificationsDiv = document.getElementById('notifications');
+
+        // Remove empty message if it exists
+        const emptyMsg = notificationsDiv.querySelector('.empty-messages');
+        if (emptyMsg) {
+            emptyMsg.remove();
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message-item ${isNew ? 'new-message' : ''}`;
+
+        const now = new Date();
+        const timeString = now.toLocaleTimeString();
+
+        messageDiv.innerHTML = `
+            <div class="message-status"></div>
+            <div class="message-header">
+                <span class="message-sender">${message.senderName || 'Admin'}</span>
+                <span class="message-time">${timeString}</span>
+            </div>
+            <div class="message-content">${message.comment}</div>
+        `;
+
+        // Add to top of messages
+        notificationsDiv.insertBefore(messageDiv, notificationsDiv.firstChild);
+
+        // Update message count
+        messageCount++;
+        updateMessageCount();
+
+        // Show notification toast for new messages
+        if (isNew) {
+            showToast(`💬 New message from ${message.senderName || 'Admin'}`);
+
+            // Play notification sound (optional)
+            playNotificationSound();
+        }
+
+        // Limit to 100 messages
+        const messages = notificationsDiv.querySelectorAll('.message-item');
+        if (messages.length > 100) {
+            messages[messages.length - 1].remove();
+            messageCount = 100;
+        }
+    }
+
+    function updateMessageCount() {
+        document.getElementById('messageCount').textContent =
+            messageCount === 1 ? '1 Message' : `${messageCount} Messages`;
+    }
+
+    function clearAllMessages() {
+        if (messageCount === 0) return;
+
+        if (confirm('Are you sure you want to clear all messages?')) {
+            const notificationsDiv = document.getElementById('notifications');
+            notificationsDiv.innerHTML = `
+                <div class="empty-messages">
+                    <div class="icon">📭</div>
+                    <h3>No messages yet</h3>
+                    <p>You'll see admin messages here when they arrive</p>
+                </div>
+            `;
+            messageCount = 0;
+            updateMessageCount();
+            showToast('🗑️ All messages cleared');
+        }
+    }
+
+    function showToast(message) {
+        // Remove existing toast if any
+        const existingToast = document.querySelector('.toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        // Show toast
+        setTimeout(() => toast.classList.add('show'), 100);
+
+        // Hide toast after 4 seconds
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    function playNotificationSound() {
+        // Create a simple beep sound
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (e) {
+            console.log('Could not play notification sound');
+        }
+    }
+
+    function registerUser() {
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim();
+
+        if (!username || !email) {
+            showToast('❌ Please fill in all fields');
+            return;
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showToast('❌ Please enter a valid email address');
+            return;
+        }
+
+        userName = username;
+        userEmail = email;
+
+        // Update UI to show registered state
+        updateConnectionStatus('registered', 'Registered');
+
+        // Hide registration form and show welcome section
+        document.getElementById('registrationSection').classList.add('hidden');
+        document.getElementById('welcomeSection').classList.add('visible');
+
+        // Update display information
+        document.getElementById('displayName').textContent = userName;
+        document.getElementById('displayEmail').textContent = userEmail;
+
+        // Save user data to REST API (optional)
+        saveUserToDatabase();
+
+        // Connect to WebSocket
+        connect();
+    }
+
+    function saveUserToDatabase() {
+        // Optional: Save user to database via REST API
+        fetch('http://localhost:8080/api/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: userName,
+                email: userEmail
+            }),
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('User saved to database:', data);
+        })
+        .catch(error => {
+            console.error('Error saving user:', error);
+            // Continue anyway, as WebSocket registration is primary
+        });
+    }
+
+    // Handle form submission
+    document.getElementById('userForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const registerButton = document.getElementById('registerButton');
+        registerButton.disabled = true;
+        registerButton.textContent = 'Registering...';
+
+        setTimeout(() => {
+            registerUser();
+            registerButton.disabled = false;
+            registerButton.textContent = '📝 Register & Connect';
+        }, 1000);
+    });
+
+    // Auto-focus on username field
+    document.getElementById('username').focus();
+
+    // Handle page visibility change to reconnect if needed
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && userEmail && !isConnected) {
+            console.log('Page became visible, checking connection...');
+            setTimeout(() => {
+                if (!isConnected) {
+                    connect();
+                }
+            }, 1000);
+        }
+    });
+
+    // Initialize message count
+    updateMessageCount();
+
+    // Show welcome message
+    setTimeout(() => {
+        showToast('👋 Welcome! Please register to start receiving messages.');
+    }, 1000);
+</script>
+</body>
+</html>
