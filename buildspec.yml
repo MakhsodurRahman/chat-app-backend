@@ -1,27 +1,53 @@
 version: 0.2
 
 phases:
+  install:
+    runtime-versions:
+      java: corretto21
+    commands:
+      - echo "=== Install Phase ==="
+      - java -version
+      - mvn -version
+
   pre_build:
     commands:
+      - echo "=== Pre-Build Phase ==="
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Image tag is $IMAGE_TAG"
+      - echo "=== Repository Structure ==="
+      - ls -la
+      - echo "=== Checking pom.xml ==="
+      - cat pom.xml | head -30
+
   build:
     commands:
-      - echo Build started on `date`
-      - echo Building the JAR file...
-      - mvn clean install -DskipTests
-      - echo Building the Docker image...
+      - echo "=== Build Phase started on $(date) ==="
+
+      # Use Maven Wrapper if present, otherwise fall back to system mvn
+      - |
+        if [ -f "./mvnw" ]; then
+          echo "Using Maven Wrapper (mvnw)"
+          chmod +x ./mvnw
+          ./mvnw clean install -DskipTests --batch-mode
+        else
+          echo "Using system Maven"
+          mvn clean install -DskipTests --batch-mode
+        fi
+
+      - echo "=== Build successful! Building Docker image... ==="
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+
   post_build:
     commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker images...
+      - echo "=== Post-Build Phase ==="
+      - echo "Pushing Docker images to ECR..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Triggering Deployment via SSM...
+      - echo "=== Triggering Deployment via SSM ==="
       - |
         aws ssm send-command \
           --document-name "AWS-RunShellScript" \
@@ -31,6 +57,7 @@ phases:
             "docker pull '$REPOSITORY_URI':latest",
             "docker stop chat-app || true",
             "docker rm chat-app || true",
-            "docker run -d --name chat-app -p 8080:8080 '$REPOSITORY_URI':latest"
+            "docker run -d --name chat-app -p 8080:8080 --restart unless-stopped '$REPOSITORY_URI':latest"
           ]' \
           --region $AWS_DEFAULT_REGION
+      - echo "=== Deployment triggered successfully ==="
