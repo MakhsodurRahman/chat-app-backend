@@ -7,7 +7,7 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - mvn clean package -DskipTests # Compiles your code and creates the .jar file
+      - mvn clean package -DskipTests # Compiles your code and creates the .jar file zdvd
   post_build:
     commands:
       - echo Build completed on `date`
