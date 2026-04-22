@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21 # Tells AWS to use Java 21
+  build:
+    commands:
+      - echo Build started on `date`
+      - mvn clean package -DskipTests # Compiles your code and creates the .jar file
+  post_build:
+    commands:
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - target/*.jar # Tells AWS to save the .jar file so the EC2 can download it
+  discard-paths: yes
