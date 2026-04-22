@@ -1,18 +1,36 @@
 version: 0.2
 
 phases:
-  install:
-    runtime-versions:
-      java: corretto21 # Tells AWS to use Java 21
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
   build:
     commands:
       - echo Build started on `date`
-      - mvn clean package -DskipTests # Compiles your code and creates the .jar file zdvd
+      - echo Building the JAR file...
+      - mvn clean package -DskipTests
+      - echo Building the Docker image...
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
-
-artifacts:
-  files:
-    - target/*.jar # Tells AWS to save the .jar file so the EC2 can download it
-  discard-paths: yes
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Triggering Deployment via SSM...
+      - |
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "Key=tag:Name,Values=$INSTANCE_NAME" \
+          --parameters 'commands=[
+            "aws ecr get-login-password --region '$AWS_DEFAULT_REGION' | docker login --username AWS --password-stdin '$REPOSITORY_URI'",
+            "docker pull '$REPOSITORY_URI':latest",
+            "docker stop chat-app || true",
+            "docker rm chat-app || true",
+            "docker run -d --name chat-app -p 8080:8080 '$REPOSITORY_URI':latest"
+          ]' \
+          --region $AWS_DEFAULT_REGION
