@@ -11,3 +11,5 @@ WORKDIR /app
 COPY --from=build /app/target/mak-service.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
+#alkdsj
