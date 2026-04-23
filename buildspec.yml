@@ -1,26 +1,11 @@
 version: 0.2
 
 phases:
-  pre_build:
-    commands:
-      - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URL
   build:
     commands:
-      - echo Build started on `date`
-      - echo "Checking files in the folder..."
-      - ls -la  # This will show if pom.xml and src exist
-      - echo "Starting Docker build..."
-      - docker build -t $ECR_REPO_URL:latest .
-  post_build:
-    commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker image...
-      - docker push $ECR_REPO_URL:latest
-      - echo Writing image definitions file...
-      - printf '[{"name":"app","imageUri":"%s"}]' $ECR_REPO_URL:latest > imagedefinitions.json
+      - echo Syncing source code to S3 for local build...
+      - aws s3 sync . s3://$ARTIFACT_BUCKET/latest-source/ --delete
 
 artifacts:
   files:
-    - imagedefinitions.json
-    - deploy-buildspec.yml # <--- CRITICAL: This fixes your "no such file" error
+    - deploy-buildspec.yml

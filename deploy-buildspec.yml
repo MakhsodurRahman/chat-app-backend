@@ -18,21 +18,44 @@
 #          ]'
 
 
+#version: 0.2
+#
+#phases:
+#  build:
+#    commands:
+#      - echo Triggering deployment on EC2 via SSM...
+#      - |
+#        aws ssm send-command \
+#          --instance-ids "$INSTANCE_ID" \
+#          --document-name "AWS-RunShellScript" \
+#          --comment "Deploying latest docker image on port 8080" \
+#          --parameters "commands=[
+#            \"aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO_URL\",
+#            \"docker pull $ECR_REPO_URL:latest\",
+#            \"docker stop chat-app || true\",
+#            \"docker rm chat-app || true\",
+#            \"docker run -d --name chat-app -p 8080:8080 $ECR_REPO_URL:latest\"
+#          ]"
+
+
 version: 0.2
 
 phases:
   build:
     commands:
-      - echo Triggering deployment on EC2 via SSM...
+      - echo Triggering local Docker build on EC2...
       - |
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --comment "Deploying latest docker image on port 8080" \
+          --comment "Building and running Docker locally" \
           --parameters "commands=[
-            \"aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO_URL\",
-            \"docker pull $ECR_REPO_URL:latest\",
+            \"mkdir -p /home/ubuntu/app\",
+            \"aws s3 sync s3://$ARTIFACT_BUCKET/latest-source/ /home/ubuntu/app/\",
+            \"cd /home/ubuntu/app\",
+            \"docker build -t chat-app .\",
             \"docker stop chat-app || true\",
             \"docker rm chat-app || true\",
-            \"docker run -d --name chat-app -p 8080:8080 $ECR_REPO_URL:latest\"
+            \"docker run -d --name chat-app -p 8080:8080 chat-app\"
           ]"
+
