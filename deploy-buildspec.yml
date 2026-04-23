@@ -14,5 +14,5 @@ phases:
             "docker pull '$ECR_REPO_URL':latest",
             "docker stop chat-app || true",
             "docker rm chat-app || true",
-            "docker run -d --name chat-app -p 80:8080 '$ECR_REPO_URL':latest"
+            "docker run -d --name chat-app -p 80:8080 '$ECR_REPO_URL':latest"   
           ]'
