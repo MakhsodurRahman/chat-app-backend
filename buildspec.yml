@@ -1,111 +1,14 @@
 version: 0.2
 
-# =============================================================
-# buildspec.yml — Spring Boot CI/CD via ECR + SSM
-#
-# Flow:
-#   1. Build Docker image (Maven runs inside multi-stage Dockerfile)
-#   2. Push image to ECR
-#   3. SSM send-command → EC2 pulls new image & restarts container
-#
-# Place this file at the ROOT of your Spring Boot GitHub repo.
-# =============================================================
-
 phases:
-  install:
-    runtime-versions:
-      java: corretto21
-    commands:
-      - echo "=== Install Phase ==="
-      - java -version
-
-  pre_build:
-    commands:
-      - |
-        echo "=== Pre-Build: Logging in to ECR ==="
-        aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
-        COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-        IMAGE_TAG=${COMMIT_HASH:-latest}
-        echo "Image tag is $IMAGE_TAG"
-
   build:
     commands:
-      - |
-        echo "=== Build Phase: Docker build (Maven runs inside Dockerfile) ==="
-        docker build -t $REPOSITORY_URI:latest .
-        docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
-
+      - echo Entered the build phase...
+      - mvn clean package
   post_build:
     commands:
-      - |
-        echo "=== Post-Build: Pushing images to ECR ==="
-        docker push $REPOSITORY_URI:latest
-        docker push $REPOSITORY_URI:$IMAGE_TAG
-        echo "Push complete."
-
-      - echo "=== Triggering deployment on EC2 via SSM ==="
-      - |
-        INSTANCE_ID=$(aws ec2 describe-instances \
-          --filters \
-            "Name=tag:Name,Values=${INSTANCE_NAME}" \
-            "Name=instance-state-name,Values=running" \
-          --query "Reservations[0].Instances[0].InstanceId" \
-          --output text)
-
-        echo "Target EC2 instance ID: $INSTANCE_ID"
-
-        if [ "$INSTANCE_ID" = "None" ] || [ -z "$INSTANCE_ID" ]; then
-          echo "ERROR: No running EC2 instance found with Name tag: $INSTANCE_NAME"
-          exit 1
-        fi
-
-        COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters "commands=[
-            \"aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}\",
-            \"docker pull ${REPOSITORY_URI}:latest\",
-            \"docker stop spring-app || true\",
-            \"docker rm spring-app || true\",
-            \"docker run -d --name spring-app -p 8080:8080 --restart unless-stopped ${REPOSITORY_URI}:latest\",
-            \"echo Deployment complete && docker ps | grep spring-app\"
-          ]" \
-          --region $AWS_DEFAULT_REGION \
-          --query "Command.CommandId" \
-          --output text)
-
-        echo "SSM Command ID: $COMMAND_ID"
-
-      - echo "=== Waiting for deployment to complete ==="
-      - |
-        for i in $(seq 1 12); do
-          sleep 10
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$INSTANCE_ID" \
-            --query "Status" \
-            --output text 2>/dev/null || echo "Pending")
-
-          echo "Attempt $i/12 — Status: $STATUS"
-
-          if [ "$STATUS" = "Success" ]; then
-            echo "Deployment succeeded!"
-            break
-          elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ] || [ "$STATUS" = "Cancelled" ]; then
-            echo "Deployment failed with status: $STATUS"
-            aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$INSTANCE_ID" \
-              --query "StandardErrorContent" \
-              --output text
-            exit 1
-          fi
-        done
-
-      - echo "=== Pipeline complete ==="
-
-# No artifacts needed — deployment is handled by SSM directly
+      - echo Build completed successfully
 artifacts:
   files:
-    - "**/*"
-  discard-paths: no
+    - target/mak-service.jar
+  discard-paths: yes

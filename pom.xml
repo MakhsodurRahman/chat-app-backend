@@ -55,6 +55,7 @@
 				</configuration>
 			</plugin>
 		</plugins>
+		<finalName>mak-service</finalName>
 	</build>
 
 </project>
