@@ -37,7 +37,7 @@
 #            \"docker run -d --name chat-app -p 8080:8080 $ECR_REPO_URL:latest\"
 #          ]"
 
-
+#
 version: 0.2
 
 phases:
