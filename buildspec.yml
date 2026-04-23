@@ -1,9 +1,17 @@
 version: 0.2
 
-# ============================================================
-# buildspec.yml — Spring Boot CI/CD via ECR + SSM
-# Place this file in the ROOT of your GitHub repo.
-# ============================================================
+# =============================================================
+# buildspec.yml — Spring Boot CI/CD with AWS CodeDeploy
+#
+# Flow:
+#   1. Build JAR with Maven
+#   2. Build & push Docker image to ECR
+#   3. Generate appspec.yml + deploy script as artifact
+#   4. CodePipeline passes artifact to CodeDeploy
+#   5. CodeDeploy agent on EC2 runs deploy script
+#
+# Place this file at the ROOT of your Spring Boot GitHub repo.
+# =============================================================
 
 phases:
   install:
@@ -12,94 +20,88 @@ phases:
     commands:
       - echo "=== Install Phase ==="
       - java -version
-      - mvn -version || echo "Maven not found, will use wrapper"
 
   pre_build:
     commands:
-      - echo "=== Pre-Build Phase ==="
-
-      # Log in to ECR
-      - echo "Logging in to Amazon ECR..."
+      - echo "=== Pre-Build: Logging in to ECR ==="
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
-
-      # Set image tag from git commit hash (fallback: 'latest')
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:-latest}
-      - echo "Building image tag: $IMAGE_TAG"
-
-      # Debug: show repo structure
-      - echo "=== Repository Files ==="
-      - ls -la
+      - echo "Image tag is $IMAGE_TAG"
 
   build:
     commands:
-      - echo "=== Build Phase started at $(date) ==="
-
-      # Build Spring Boot JAR (use Maven Wrapper if present)
+      - echo "=== Build Phase: Maven + Docker ==="
       - |
         if [ -f "./mvnw" ]; then
-          echo "Using Maven Wrapper (mvnw)"
           chmod +x ./mvnw
           ./mvnw clean package -DskipTests --batch-mode
         else
-          echo "Using system Maven"
           mvn clean package -DskipTests --batch-mode
         fi
-
-      - echo "=== JAR built. Building Docker image... ==="
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
-      - echo "Docker image tagged as $IMAGE_TAG"
 
   post_build:
     commands:
-      - echo "=== Post-Build Phase ==="
-
-      # Push both tags to ECR
-      - echo "Pushing images to ECR..."
+      - echo "=== Post-Build: Pushing to ECR ==="
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo "Push complete."
 
-      # Deploy to EC2 via SSM Run Command (targets EC2 by Name tag)
-      - echo "=== Triggering deployment on EC2 via SSM ==="
+      # ── Generate CodeDeploy artifact ───────────────────────────
+      # appspec.yml tells CodeDeploy what to do on EC2
+      - echo "=== Generating CodeDeploy deployment bundle ==="
+      - mkdir -p codedeploy/scripts
+
       - |
-        COMMAND_ID=$(aws ssm send-command \
-          --document-name "AWS-RunShellScript" \
-          --targets "Key=tag:Name,Values=${INSTANCE_NAME}" \
-          --parameters "commands=[
-            \"aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}\",
-            \"docker pull ${REPOSITORY_URI}:latest\",
-            \"docker stop spring-app || true\",
-            \"docker rm spring-app || true\",
-            \"docker run -d --name spring-app -p 8080:8080 --restart unless-stopped ${REPOSITORY_URI}:latest\"
-          ]" \
-          --region $AWS_DEFAULT_REGION \
-          --query "Command.CommandId" \
-          --output text)
+        cat > codedeploy/appspec.yml << 'EOF'
+        version: 0.0
+        os: linux
+        hooks:
+          AfterInstall:
+            - location: scripts/deploy.sh
+              timeout: 300
+              runas: root
+        EOF
 
-        echo "SSM Command ID: $COMMAND_ID"
+      # deploy.sh runs on EC2 — ECR URI is baked in at build time
+      - |
+        cat > codedeploy/scripts/deploy.sh << DEPLOY
+        #!/bin/bash
+        set -e
+        REGION="${AWS_DEFAULT_REGION}"
+        IMAGE="${REPOSITORY_URI}:latest"
 
-        # Wait up to 90 seconds for SSM command to complete
-        echo "Waiting for deployment to complete..."
-        for i in $(seq 1 9); do
-          sleep 10
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$(aws ec2 describe-instances \
-              --filters "Name=tag:Name,Values=${INSTANCE_NAME}" "Name=instance-state-name,Values=running" \
-              --query "Reservations[0].Instances[0].InstanceId" \
-              --output text)" \
-            --query "Status" \
-            --output text 2>/dev/null || echo "Pending")
-          echo "Attempt $i: Status = $STATUS"
-          if [ "$STATUS" = "Success" ]; then
-            echo "✅ Deployment succeeded!"
-            break
-          elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
-            echo "❌ Deployment failed with status: $STATUS"
-            exit 1
-          fi
-        done
+        echo "--- Logging in to ECR ---"
+        aws ecr get-login-password --region \$REGION | docker login --username AWS --password-stdin "${REPOSITORY_URI}"
 
-      - echo "=== Pipeline complete ==="
+        echo "--- Pulling latest image ---"
+        docker pull \$IMAGE
+
+        echo "--- Stopping old container (if any) ---"
+        docker stop spring-app || true
+        docker rm   spring-app || true
+
+        echo "--- Starting new container ---"
+        docker run -d \
+          --name spring-app \
+          -p 8080:8080 \
+          --restart unless-stopped \
+          \$IMAGE
+
+        echo "--- Deployment complete! ---"
+        docker ps | grep spring-app
+        DEPLOY
+
+      - chmod +x codedeploy/scripts/deploy.sh
+      - echo "=== Bundle ready ==="
+
+# The build_output artifact passed to CodeDeploy must contain:
+#   appspec.yml  (at root)
+#   scripts/deploy.sh
+artifacts:
+  base-directory: codedeploy
+  files:
+    - appspec.yml
+    - scripts/deploy.sh
