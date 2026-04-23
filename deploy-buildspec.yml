@@ -1,0 +1,18 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo Triggering deployment on EC2 via SSM...
+      - |
+        aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploying latest docker image" \
+          --parameters 'commands=[
+            "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin '$ECR_REPO_URL'",
+            "docker pull '$ECR_REPO_URL':latest",
+            "docker stop chat-app || true",
+            "docker rm chat-app || true",
+            "docker run -d --name chat-app -p 80:8080 '$ECR_REPO_URL':latest"
+          ]'
