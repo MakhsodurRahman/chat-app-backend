@@ -8,7 +8,9 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Building the Docker image...
+      - echo "Checking files in the folder..."
+      - ls -la  # This will show if pom.xml and src exist
+      - echo "Starting Docker build..."
       - docker build -t $ECR_REPO_URL:latest .
   post_build:
     commands:
@@ -19,4 +21,6 @@ phases:
       - printf '[{"name":"app","imageUri":"%s"}]' $ECR_REPO_URL:latest > imagedefinitions.json
 
 artifacts:
-  files: imagedefinitions.json
+  files:
+    - imagedefinitions.json
+    - deploy-buildspec.yml # <--- CRITICAL: This fixes your "no such file" error
