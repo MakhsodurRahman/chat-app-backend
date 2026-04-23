@@ -19,4 +19,6 @@ phases:
       - printf '[{"name":"app","imageUri":"%s"}]' $ECR_REPO_URL:latest > imagedefinitions.json
 
 artifacts:
-  files: imagedefinitions.json
+  files:
+    - imagedefinitions.json
+    - deploy-buildspec.yml # <--- ADD THIS LINE!
