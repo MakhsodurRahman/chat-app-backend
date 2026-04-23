@@ -21,4 +21,4 @@ phases:
 artifacts:
   files:
     - imagedefinitions.json
-    - deploy-buildspec.yml # <--- ADD THIS LINE!
+    - deploy-buildspec.yml
